@@ -1,0 +1,1 @@
+in wordexp.c , arithm_expand() is just implemented minimally using grok. Find its better implementation.
