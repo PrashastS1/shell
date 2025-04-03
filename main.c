@@ -10,16 +10,28 @@
 int main(int argc, char **argv)
 {
     char *cmd;
+
+    (void)argc; // Suppress unused parameter warnings if not used
+    (void)argv;
+
     initsh();
+
+    init_job_table();
 
     do
     {
+
+        update_job_statuses();
+
         print_prompt1();
 
         cmd = read_cmd();
 
         if(!cmd)
         {
+            fprintf(stdout, "exit\n"); // Optional: Print exit like other shells
+            cleanup_job_table(); 
+
             exit(EXIT_SUCCESS);
         }
 
@@ -41,11 +53,14 @@ int main(int argc, char **argv)
         src.buffer   = cmd;
         src.bufsize  = strlen(cmd);
         src.curpos   = INIT_SRC_POS;
+
         parse_and_execute(&src);
 
         free(cmd);
 
     } while(1);
+
+    cleanup_job_table(); // ---> ADD: Cleanup job table before normal exit <---
 
     exit(EXIT_SUCCESS);
 }
