@@ -8,6 +8,8 @@
 #include "shell.h"
 #include "node.h"
 #include "executor.h"
+#include <signal.h> // Needed for kill() and SIGTERM
+#include <sys/types.h> // Often needed for pid_t (likely already included via other headers, but good practice)
 
 job_entry jobs_table[MAX_JOBS];
 

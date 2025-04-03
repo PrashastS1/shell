@@ -14,5 +14,7 @@ shunt.o: shunt.c shell.h source.h symtab/symtab.h symtab/../node.h
 builtins.o: builtins/builtins.c builtins/../shell.h source.h
 dump.o: builtins/dump.c builtins/../shell.h source.h \
   builtins/../symtab/symtab.h builtins/../symtab/../node.h
+jobs.o: builtins/jobs.c shell.h source.h
+fg.o: builtins/fg.c shell.h source.h
 symtab.o: symtab/symtab.c symtab/../shell.h source.h symtab/../node.h \
   symtab/../parser.h scanner.h symtab/symtab.h
