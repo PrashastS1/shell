@@ -1,72 +1,11 @@
-// #ifndef SHELL_H
-// #define SHELL_H
-
-// void print_prompt1(void);
-// void print_prompt2(void);
-// void initsh(void);
-
-// char *read_cmd(void);
-
-// #include "source.h"
-// int  parse_and_execute(struct source_s *src);
-
-// /* shell builtin utilities */
-// int dump(int argc, char **argv);
-
-// /* struct for builtin utilities */
-// struct builtin_s
-// {
-//     char *name;    /* utility name */
-//     int (*func)(int argc, char **argv); /* function to call to execute the utility */
-// };
-
-// /* the list of builtin utilities */
-// extern struct builtin_s builtins[];
-
-// /* and their count */
-// extern int builtins_count;
-
-// // used for word expansion 
-// struct word_s
-// {
-//     char  *data;
-//     int    len;
-//     struct word_s *next;
-// };
-
-// struct word_s *make_word(char *str);
-// void free_all_words(struct word_s *first);
-
-// #endif
-
-
-/* 
- *    Programmed By: Mohammed Isam [mohammed_isam1984@yahoo.com]
- *    Copyright 2020 (c)
- * 
- *    file: shell.h
- *    This file is part of the "Let's Build a Linux Shell" tutorial.
- *
- *    This tutorial is free software: you can redistribute it and/or modify
- *    it under the terms of the GNU General Public License as published by
- *    the Free Software Foundation, either version 3 of the License, or
- *    (at your option) any later version.
- *
- *    This tutorial is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU General Public License for more details.
- *
- *    You should have received a copy of the GNU General Public License
- *    along with this tutorial.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #ifndef SHELL_H
 #define SHELL_H
+#define MAX_JOBS 16
 
 #include <stddef.h>     /* size_t */
 #include <glob.h>
 #include "source.h"
+#include <sys/types.h>
 
 void print_prompt1(void);
 void print_prompt2(void);
@@ -78,12 +17,47 @@ void initsh(void);
 /* shell builtin utilities */
 int dump(int argc, char **argv);
 
+struct node_s;
+
 /* struct for builtin utilities */
 struct builtin_s
 {
     char *name;    /* utility name */
     int (*func)(int argc, char **argv); /* function to call to execute the utility */
 };
+
+typedef enum {
+    JOB_STATE_UNKNOWN,
+    JOB_STATE_RUNNING,
+    JOB_STATE_DONE,
+    JOB_STATE_TERMINATED
+    // Add JOB_STATE_STOPPED later if implementing full Ctrl+Z
+} job_state;
+
+typedef struct {
+    pid_t pid;
+    int jid;          // Job ID
+    job_state state;
+    char *cmd;        // Command line string (malloc'd)
+} job_entry;
+
+extern job_entry jobs_table[MAX_JOBS];
+
+// Declare job helper functions (defined in executor.c)
+void init_job_table(void);
+void cleanup_job_table(void);
+int add_job(pid_t pid, char **argv); // Takes argv to reconstruct cmd
+void remove_job_by_pid(pid_t pid);
+pid_t find_pid_by_jid(int jid);
+int find_job_slot_by_pid(pid_t pid); // Helper for fg/jobs message
+void update_job_statuses(void);
+
+// Declare NEW built-in functions (defined in builtins/jobs.c, builtins/fg.c)
+int shell_jobs(int argc, char **argv);
+int shell_fg(int argc, char **argv);
+// ---> End Job Control Declarations <---
+
+
 
 /* the list of builtin utilities */
 extern struct builtin_s builtins[];
