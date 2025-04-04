@@ -1,7 +1,8 @@
 only dump.c executed as builtin. Also write functions for cd, help.
 piping (done)
 input output redirection
-command history
+command history viewing (done)
+command history re-execution
 line editing
 tab completion
 syntax highlighting
