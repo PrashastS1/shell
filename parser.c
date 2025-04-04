@@ -54,7 +54,7 @@ struct node_s *parse_pipeline(struct token_s **tok_p);
 struct node_s *parse_simple_command(struct token_s **tok_p)
 {
 
-    fprintf(stderr, "DEBUG: parse_simple_command called with token: %s\n", (*tok_p) ? (*tok_p)->text : "(NULL)");
+    // fprintf(stderr, "DEBUG: parse_simple_command called with token: %s\n", (*tok_p) ? (*tok_p)->text : "(NULL)");
 
 
     if (!tok_p || !(*tok_p) || (*tok_p) == &eof_token) {
@@ -107,7 +107,7 @@ struct node_s *parse_simple_command(struct token_s **tok_p)
 struct node_s *parse_pipeline(struct token_s **tok_p)
 {
 
-    fprintf(stderr, "DEBUG: parse_pipeline called with token: %s\n", (*tok_p) ? (*tok_p)->text : "(NULL)");
+    // fprintf(stderr, "DEBUG: parse_pipeline called with token: %s\n", (*tok_p) ? (*tok_p)->text : "(NULL)");
 
     if (!tok_p || !(*tok_p) || (*tok_p) == &eof_token) {
         return NULL;
@@ -124,8 +124,8 @@ struct node_s *parse_pipeline(struct token_s **tok_p)
     if ((*tok_p) != &eof_token && strcmp((*tok_p)->text, "|") == 0)
     {
 
-        fprintf(stderr, "DEBUG: Found pipe symbol '|'\n"); // Add this
-        fflush(stderr);
+        // fprintf(stderr, "DEBUG: Found pipe symbol '|'\n"); // Add this
+        // fflush(stderr);
 
         struct source_s *src = (*tok_p)->src;
 
@@ -133,37 +133,38 @@ struct node_s *parse_pipeline(struct token_s **tok_p)
         // Ensure we don't free the static eof_token
         if (*tok_p && *tok_p != &eof_token) {
             free_token(*tok_p);
+            *tok_p = NULL;
         } 
         
-        else if (*tok_p == &eof_token) {
-             // Should not happen if pipe was matched, but safety check
-             fprintf(stderr, "DEBUG: Unexpected EOF instead of pipe token!?\n");
-             fflush(stderr);
-             // Handle error appropriately - cannot proceed
-             free_node_tree(left_cmd);
-             return NULL;
-        }
+        // else if (*tok_p == &eof_token) {
+        //      // Should not happen if pipe was matched, but safety check
+        //     //  fprintf(stderr, "DEBUG: Unexpected EOF instead of pipe token!?\n");
+        //     //  fflush(stderr);
+        //      // Handle error appropriately - cannot proceed
+        //      free_node_tree(left_cmd);
+        //      return NULL;
+        // }
 
 
 
 
         // Consume the '|' token
         // free_token(*tok_p);
-        *tok_p = tokenize((*tok_p)->src); // Get token after pipe
+        // *tok_p = tokenize((*tok_p)->src); // Get token after pipe
         *tok_p = tokenize(src);  
 
         // ---> Enhanced Debug Print <---
-        fprintf(stderr, "DEBUG: Token after '|' is: ");
-        if (!(*tok_p)) {
-            fprintf(stderr, "(NULL token pointer)\n");
-        } else if ((*tok_p) == &eof_token) {
-            fprintf(stderr, "(EOF token)\n");
-        } else if (!(*tok_p)->text) {
-             fprintf(stderr, "(NULL text field)\n");
-        } else {
-             fprintf(stderr, "'%s'\n", (*tok_p)->text);
-        }
-        fflush(stderr); // Force output
+        // fprintf(stderr, "DEBUG: Token after '|' is: ");
+        // if (!(*tok_p)) {
+        //     fprintf(stderr, "(NULL token pointer)\n");
+        // } else if ((*tok_p) == &eof_token) {
+        //     fprintf(stderr, "(EOF token)\n");
+        // } else if (!(*tok_p)->text) {
+        //      fprintf(stderr, "(NULL text field)\n");
+        // } else {
+        //      fprintf(stderr, "'%s'\n", (*tok_p)->text);
+        // }
+        // fflush(stderr); // Force output
 
          if (!(*tok_p) || (*tok_p) == &eof_token) { // Check for error or EOF after '|'
              fprintf(stderr, "shell: syntax error: expected command after '|'\n");
@@ -184,8 +185,8 @@ struct node_s *parse_pipeline(struct token_s **tok_p)
 
         // 3. Recursively parse the rest of the pipeline
 
-        fprintf(stderr, "DEBUG: Calling parse_pipeline recursively for right side...\n"); // Add this
-        fflush(stderr);
+        // fprintf(stderr, "DEBUG: Calling parse_pipeline recursively for right side...\n"); // Add this
+        // fflush(stderr);
 
         struct node_s *right_pipeline = parse_pipeline(tok_p);
         if (!right_pipeline) {
