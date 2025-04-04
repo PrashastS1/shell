@@ -1,4 +1,3 @@
-in wordexp.c , arithm_expand() is just implemented minimally using grok. Find its better implementation.
 only dump.c executed as builtin. Also write functions for cd, help.
 piping (done)
 input output redirection
