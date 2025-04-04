@@ -39,10 +39,15 @@ struct node_s
     union  symval_u val;        /* value of this node */
     int    children;            /* number of child nodes */
     struct node_s *first_child; /* first child node */
-    struct node_s *next_sibling, *prev_sibling; /*
-                                                 * if this is a child node, keep
-                                                 * pointers to prev/next siblings
-                                                 */
+    struct node_s *next_sibling, *prev_sibling;
+
+    // ---> ADD Redirection fields <---
+    char  *infile;              /* filename for input redirection (<) */
+    char  *outfile;             /* filename for output redirection (>, >>) */
+    int    append_mode;         /* non-zero if output redirection is append (>>) */
+    // ---> END Redirection fields <---
+
+
 };
 
 struct  node_s *new_node(enum node_type_e type);

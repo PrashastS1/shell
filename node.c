@@ -98,5 +98,16 @@ void free_node_tree(struct node_s *node)
             free(node->val.str);
         }
     }
+
+    // ---> Free redirection filenames if they exist <---
+    if(node->infile) {
+        free(node->infile);
+    }
+    if(node->outfile) {
+        free(node->outfile);
+    }
+    // ---> END Free redirection filenames <---
+
+
     free(node);
 }

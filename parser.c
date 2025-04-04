@@ -6,6 +6,11 @@
 #include "scanner.h"
 #include "node.h"
 #include "source.h"
+#include <fcntl.h>
+#include <stdlib.h>
+
+// Helper function prototype (implement below or use existing if available)
+struct token_s *consume_token(struct token_s **tok_p, struct source_s *src);
 
 // Forward declaration for the new function
 struct node_s *parse_pipeline(struct token_s **tok_p);
@@ -70,32 +75,107 @@ struct node_s *parse_simple_command(struct token_s **tok_p)
     struct source_s *src = (*tok_p)->src;
 
     // Loop while the current token is not EOF, newline, or pipe
-    while ((*tok_p) != &eof_token && (*tok_p)->text[0] != '\n' && strcmp((*tok_p)->text, "|") != 0)
-    {
-        struct node_s *word = new_node(NODE_VAR);
-        if (!word) {
-            free_node_tree(cmd);
-            // Don't free the current token (*tok_p), let caller handle
-            return NULL;
-        }
-        set_node_val_str(word, (*tok_p)->text);
-        add_child_node(cmd, word);
+    // while ((*tok_p) != &eof_token && (*tok_p)->text[0] != '\n' && strcmp((*tok_p)->text, "|") != 0)
+    // {
+    //     struct node_s *word = new_node(NODE_VAR);
+    //     if (!word) {
+    //         free_node_tree(cmd);
+    //         // Don't free the current token (*tok_p), let caller handle
+    //         return NULL;
+    //     }
+    //     set_node_val_str(word, (*tok_p)->text);
+    //     add_child_node(cmd, word);
 
-        // Consume the current token and get the next one
-        free_token(*tok_p);
-        *tok_p = tokenize(src);
+    //     // Consume the current token and get the next one
+    //     free_token(*tok_p);
+    //     *tok_p = tokenize(src);
+    //     if (!(*tok_p)) { // Check if tokenize returned NULL (error?)
+    //          fprintf(stderr, "shell: error tokenizing input\n");
+    //          free_node_tree(cmd);
+    //          return NULL; // Indicate error
+    //     }
+    // }
+
+    while ((*tok_p) != &eof_token && (*tok_p)->text[0] != '\n' && strcmp((*tok_p)->text, "|") != 0 )
+     {
+        // ---> Check for redirection operators <---
+        if (strcmp((*tok_p)->text, "<") == 0) {
+            // Input Redirection
+            free_token(*tok_p); // Consume '<'
+            *tok_p = tokenize(src);
+            if (!(*tok_p) || (*tok_p) == &eof_token || (*tok_p)->text[0] == '\n' || strcmp((*tok_p)->text, "|") == 0 || strcmp((*tok_p)->text, ">") == 0 || strcmp((*tok_p)->text, ">>") == 0 || strcmp((*tok_p)->text, "<") == 0) {
+                fprintf(stderr, "shell: syntax error: expected filename after '<'\n");
+                free_node_tree(cmd);
+                if(*tok_p) free_token(*tok_p);
+                return NULL;
+            }
+            // Store infile name (handle potential previous infile?)
+            if (cmd->infile) free(cmd->infile); // Overwrite previous if any
+            cmd->infile = strdup((*tok_p)->text);
+            if (!cmd->infile) { perror("shell: strdup infile"); free_node_tree(cmd); free_token(*tok_p); return NULL; }
+            // Consume filename token
+            free_token(*tok_p);
+            *tok_p = tokenize(src);
+
+        } else if (strcmp((*tok_p)->text, ">") == 0 || strcmp((*tok_p)->text, ">>") == 0) {
+            // Output Redirection (Overwrite or Append)
+            int is_append = (strcmp((*tok_p)->text, ">>") == 0);
+            free_token(*tok_p); // Consume '>' or '>>'
+            *tok_p = tokenize(src);
+             if (!(*tok_p) || (*tok_p) == &eof_token || (*tok_p)->text[0] == '\n' || strcmp((*tok_p)->text, "|") == 0 || strcmp((*tok_p)->text, ">") == 0 || strcmp((*tok_p)->text, ">>") == 0 || strcmp((*tok_p)->text, "<") == 0) {
+                fprintf(stderr, "shell: syntax error: expected filename after '%s'\n", is_append ? ">>" : ">");
+                free_node_tree(cmd);
+                if(*tok_p) free_token(*tok_p);
+                return NULL;
+            }
+            // Store outfile name (handle potential previous outfile?)
+            if (cmd->outfile) free(cmd->outfile); // Overwrite previous if any
+            cmd->outfile = strdup((*tok_p)->text);
+            if (!cmd->outfile) { perror("shell: strdup outfile"); free_node_tree(cmd); free_token(*tok_p); return NULL; }
+            cmd->append_mode = is_append;
+            // Consume filename token
+            free_token(*tok_p);
+            *tok_p = tokenize(src);
+
+        } else {
+            // ---> Regular command word (argument/command name) <---
+             struct node_s *word = new_node(NODE_VAR);
+             if (!word) {
+                 free_node_tree(cmd);
+                // Don't free *tok_p, loop will exit or continue
+                 return NULL;
+             }
+             set_node_val_str(word, (*tok_p)->text);
+             add_child_node(cmd, word);
+
+             // Consume the current token and get the next one
+             free_token(*tok_p);
+             *tok_p = tokenize(src);
+        } // End of if/else for redirection vs word
+
         if (!(*tok_p)) { // Check if tokenize returned NULL (error?)
-             fprintf(stderr, "shell: error tokenizing input\n");
-             free_node_tree(cmd);
-             return NULL; // Indicate error
+             // This might happen after consuming a filename
+            fprintf(stderr, "shell: error tokenizing input\n");
+            free_node_tree(cmd);
+             // Don't free cmd here, return what we have? Or signal error?
+             // Let's return NULL for error.
+            if(cmd) free_node_tree(cmd);
+            return NULL; // Indicate error
         }
     }
 
-    // If we parsed no words, it's an empty command node (or error)
-    if (cmd->children == 0) {
-        free_node_tree(cmd);
-        return NULL;
-    }
+    if (!cmd) return NULL;
+
+    // // If we parsed no words, it's an empty command node (or error)
+    // if (cmd->children == 0) {
+    //     free_node_tree(cmd);
+    //     return NULL;
+    // }
+
+    if (cmd->children == 0 && cmd->infile == NULL && cmd->outfile == NULL) {
+          free_node_tree(cmd);
+          return NULL;
+     }
 
     return cmd;
 }

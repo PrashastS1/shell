@@ -8,6 +8,7 @@
 #include "shell.h"
 #include "node.h"
 #include "executor.h"
+#include <fcntl.h>
 #include <signal.h> // Needed for kill() and SIGTERM
 #include <sys/types.h> // Often needed for pid_t (likely already included via other headers, but good practice)
 
@@ -476,6 +477,54 @@ int do_simple_command(struct node_s *node)
         // Child process
         // Add signal handling setup here if needed (e.g., reset SIGINT)
         // Add setpgid() here for full job control
+
+        int input_fd = -1;
+        int output_fd = -1;
+        struct node_s *command_node = node;
+
+        if (command_node->infile) {
+            input_fd = open(command_node->infile, O_RDONLY);
+            if (input_fd < 0) {
+                fprintf(stderr, "shell: failed to open input file '%s': %s\n",
+                        command_node->infile, strerror(errno));
+                _exit(EXIT_FAILURE); // Use _exit in child
+            }
+            // Redirect stdin (0) to input_fd
+            if (dup2(input_fd, STDIN_FILENO) < 0) {
+                perror("shell: dup2 stdin failed");
+                close(input_fd); // Close original fd
+                _exit(EXIT_FAILURE);
+            }
+            close(input_fd); // Close original fd after successful dup2
+        }
+
+        // 2. Output Redirection (>, >>)
+        if (command_node->outfile) {
+            int open_flags = O_WRONLY | O_CREAT;
+            if (command_node->append_mode) {
+                open_flags |= O_APPEND; // Append mode >>
+            } else {
+                open_flags |= O_TRUNC;  // Overwrite mode >
+            }
+            // Set standard file permissions (rw-r--r--)
+            mode_t file_mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+
+            output_fd = open(command_node->outfile, open_flags, file_mode);
+            if (output_fd < 0) {
+                 fprintf(stderr, "shell: failed to open output file '%s': %s\n",
+                         command_node->outfile, strerror(errno));
+                 // Don't need to close input_fd here as it's already closed/dup'd
+                 _exit(EXIT_FAILURE);
+            }
+            // Redirect stdout (1) to output_fd
+            if (dup2(output_fd, STDOUT_FILENO) < 0) {
+                perror("shell: dup2 stdout failed");
+                close(output_fd);
+                _exit(EXIT_FAILURE);
+            }
+            close(output_fd); // Close original fd after successful dup2
+        }
+        // --- Redirection Setup Complete ---
 
         // Use _exit() on failure inside child!
         if (do_exec_cmd(argc, argv) == 0) { // do_exec_cmd tries execv
