@@ -4,6 +4,7 @@
 enum node_type_e
 {
     NODE_COMMAND,           /* simple command */
+    NODE_PIPE,
     NODE_VAR,               /* variable name (or simply, a word) */
 };
 

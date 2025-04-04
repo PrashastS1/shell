@@ -13,6 +13,9 @@
 
 job_entry jobs_table[MAX_JOBS];
 
+// --- Forward declaration for the dispatcher ---
+int execute_node(struct node_s *node);
+
 static char* reconstruct_cmd(int argc, char **argv) {
     if (argc == 0) return NULL;
     size_t total_len = 0;
@@ -509,4 +512,124 @@ int do_simple_command(struct node_s *node)
     free_buffer(argc, argv);
     return 1; // Indicate success, continue shell loop
 } // --- End of do_simple_command ---
+
+// ---> NEW Function to handle pipe execution <---
+int do_pipe_command(struct node_s *node) {
+    if (!node || node->type != NODE_PIPE || node->children != 2 || !node->first_child || !node->first_child->next_sibling) {
+        fprintf(stderr, "shell: invalid pipe node structure for execution\n");
+        return 0; // Indicate failure
+    }
+
+    struct node_s *cmd1_node = node->first_child;
+    struct node_s *cmd2_node = node->first_child->next_sibling;
+
+    int pipefd[2]; // pipefd[0] = read end, pipefd[1] = write end
+    pid_t pid1, pid2;
+    int status1 = 0, status2 = 0; // Initialize statuses
+
+    // 1. Create the pipe
+    if (pipe(pipefd) == -1) {
+        perror("shell: pipe");
+        return 0;
+    }
+
+    // 2. Fork for cmd1 (left side)
+    pid1 = fork();
+    if (pid1 < 0) {
+        perror("shell: fork (cmd1)");
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return 0;
+    }
+
+    if (pid1 == 0) {
+        // --- Child 1 (cmd1) ---
+        close(pipefd[0]); // Child 1 doesn't read from the pipe
+
+        // Redirect stdout to pipe write end, checking for error
+        if (dup2(pipefd[1], STDOUT_FILENO) == -1) {
+            perror("shell: dup2 stdout");
+            close(pipefd[1]); // Close original write end
+            _exit(EXIT_FAILURE);
+        }
+        close(pipefd[1]); // Close original write end after successful dup2
+
+        // Execute the left-hand command node
+        execute_node(cmd1_node); // Recursive call
+
+        // If execute_node returns, it means exec failed in do_simple_command
+        _exit(EXIT_FAILURE);
+    }
+
+    // 3. Fork for cmd2 (right side)
+    pid2 = fork();
+    if (pid2 < 0) {
+        perror("shell: fork (cmd2)");
+        close(pipefd[0]); // Close pipe fds
+        close(pipefd[1]);
+        // Attempt to clean up child 1
+        kill(pid1, SIGTERM);
+        waitpid(pid1, NULL, 0);
+        return 0;
+    }
+
+    if (pid2 == 0) {
+        // --- Child 2 (cmd2) ---
+        close(pipefd[1]); // Child 2 doesn't write to the pipe
+
+        // Redirect stdin to pipe read end, checking for error
+        if (dup2(pipefd[0], STDIN_FILENO) == -1) {
+            perror("shell: dup2 stdin");
+            close(pipefd[0]); // Close original read end
+            _exit(EXIT_FAILURE);
+        }
+        close(pipefd[0]); // Close original read end after successful dup2
+
+        // Execute the right-hand command node
+        execute_node(cmd2_node); // Recursive call
+
+        // If execute_node returns, it means exec failed
+        _exit(EXIT_FAILURE);
+    }
+
+    // 4. Parent Process
+    // Close BOTH pipe ends in the parent *immediately* after forking children.
+    close(pipefd[0]);
+    close(pipefd[1]);
+
+    // 5. Wait for both children
+    // It's generally better to wait in order, but waiting for the
+    // second one first helps determine the overall pipeline status ($?) easier.
+    waitpid(pid2, &status2, 0);
+    waitpid(pid1, &status1, 0);
+
+    // TODO: Implement proper exit status ($?) handling based on status2
+    // For now, return 1 indicating the shell should continue
+    return 1;
+}
+
+// ---> NEW Top-level executor dispatcher function <---
+int execute_node(struct node_s *node) {
+    if (!node) {
+        return 1; // Nothing to execute is considered success
+    }
+
+    switch (node->type) {
+        case NODE_COMMAND:
+            // Call your existing function for simple commands
+            return do_simple_command(node);
+
+        case NODE_PIPE:
+            // Call the new pipe handling function
+            return do_pipe_command(node);
+
+        // Add cases for other node types later
+        // case NODE_REDIRECT_OUT: ...
+        // case NODE_SEQUENCE: ... // For ';'
+
+        default:
+            fprintf(stderr, "shell: unknown node type in execute_node: %d\n", node->type);
+            return 0; // Indicate failure
+    }
+}
 
