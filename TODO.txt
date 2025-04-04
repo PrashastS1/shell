@@ -7,3 +7,106 @@ line editing
 tab completion
 syntax highlighting
 job control ?
+
+Okay, that behavior indicates a problem with how the pipeline interacts with backgrounding (&).
+
+Here's the breakdown of what's happening and why "Pipeline Background Done" appears immediately:
+
+Command: sleep 10 | echo "Pipeline Background Done" &
+
+Parsing: Your parser correctly identifies this as a pipeline (sleep 10 | echo ...) to be run in the background (&).
+
+Execution (do_simple_command detects &): Your main execution logic forks the entire pipeline handling mechanism (likely the call to do_pipe_command within execute_node) into the background.
+
+Parent Shell: The parent shell adds the job ([1] 9850) and immediately returns to the prompt. This part is correct for backgrounding.
+
+Background Execution (do_pipe_command): Now, the do_pipe_command function runs in the background process.
+
+It creates the pipe (pipefd).
+
+It forks Child 1 (pid1 for sleep 10).
+
+It forks Child 2 (pid2 for echo ...). This is Process ID 9850 that got reported.
+
+The Problem: The backgrounded do_pipe_command (the intermediate parent process) does not wait for pid1 (sleep 10) or pid2 (echo) because the entire operation was meant to be backgrounded by the main shell loop.
+
+do_pipe_command closes its pipe ends and likely exits almost immediately.
+
+Child 2 (echo) Executes: Since echo doesn't depend on input from the pipe in this specific case (it just prints a fixed string), it runs immediately, prints Pipeline Background Done to the terminal, and exits very quickly.
+
+Child 1 (sleep) Executes: sleep 10 starts running. It doesn't produce output. It will continue running for 10 seconds.
+
+Prompt Timing: You mentioned the prompt appears "after some time". This "some time" is likely the 10 seconds that the sleep 10 command runs for. Why? Because even though the initial backgrounding worked, the shell's update_job_statuses function in the main loop is still tracking the background job (JID 1, PID 9850 - the echo process). It sees echo finish immediately, but it might be waiting implicitly or explicitly somewhere for the entire conceptual "job" to finish before showing the prompt again, or update_job_statuses waits for the original backgrounded process (the one running do_pipe_command), which might only exit after its children (sleep, echo) have been waited for (even though it didn't wait itself). Alternatively, and more likely, the sleep 10 process might still be associated with the terminal in some way, preventing the main shell loop from proceeding until it finishes.
+
+Why is this wrong?
+
+The echo should only execute after the sleep command finishes and closes its end of the pipe (providing EOF to echo's stdin, although echo ignores stdin).
+
+The output "Pipeline Background Done" should appear after 10 seconds, not immediately.
+
+The shell prompt should appear immediately after the [1] 9850 is printed.
+
+Where is the Bug Likely Located?
+
+The interaction between the backgrounding logic in do_simple_command (or wherever & is handled) and the pipeline execution logic in do_pipe_command is flawed.
+
+Incorrect Backgrounding Target: The main shell might be backgrounding the wrong process or not correctly detaching the entire pipeline from the controlling terminal or wait logic.
+
+do_pipe_command Not Waiting (Correct for background, but...): The intermediate parent process created by do_simple_command for the background task correctly doesn't wait for the pipeline children within itself. However, the main shell needs to treat the entire pipeline as the background job.
+
+Job Control Logic: The add_job function is probably only adding the PID of the second command (echo, pid 9850) to the job table. It needs to conceptually track the whole pipeline as one job. Real shells often use a process group ID for this.
+
+How to Fix (Conceptual - Requires Significant Change):
+
+This requires a more sophisticated approach to job control and process groups, which is complex:
+
+Process Groups: When a pipeline is executed (foreground or background):
+
+The first child process (sleep 10 in this case) should call setpgid(0, 0) to create a new process group with itself as the leader.
+
+Subsequent processes in the pipeline (echo) should call setpgid(0, pid1) where pid1 is the PID of the first process, joining the same process group.
+
+Backgrounding Process Groups: When backgrounding (&), the shell should:
+
+Add the process group ID (PGID) (which is usually the PID of the first process, pid1) to the job table, conceptually representing the entire pipeline job.
+
+Not wait for any processes in that group.
+
+Ensure the background process group is disconnected from the controlling terminal (this prevents sleep 10 from interfering with the prompt).
+
+Foregrounding Process Groups (fg): When fg is used:
+
+Give terminal control to the entire process group using tcsetpgrp(terminal_fd, job_pgid).
+
+Wait for all processes in that group (or specifically the last one, managing zombies for others).
+
+Take terminal control back using tcsetpgrp(terminal_fd, shell_pgid).
+
+update_job_statuses: Needs to potentially check the status of the entire process group or track individual PIDs within the job entry.
+
+Simpler (But Less Correct) Fix Attempt:
+
+You could try modifying do_pipe_command to always wait for its children (pid1 and pid2) before exiting, even when backgrounded by the main shell.
+
+Modify executor.c -> do_pipe_command: Remove the distinction between foreground/background inside this function. Always include the waitpid(pid2, ...) and waitpid(pid1, ...) calls at the end.
+
+// Inside do_pipe_command, near the end
+
+    // 4. Parent Process
+    close(pipefd[0]);
+    close(pipefd[1]);
+
+    // 5. Wait for both children REGARDLESS of background status from caller
+    waitpid(pid2, &status2, 0); // Wait for second command
+    waitpid(pid1, &status1, 0); // Wait for first command to prevent zombie
+
+    // Return status based on status2 (last command)
+    // return calculate_status(status2); // Replace with actual status logic if needed
+    return 1; // Or return success for now
+
+
+Effect: If you run sleep 10 | echo ... &, the intermediate process running do_pipe_command will now wait for 10 seconds in the background. The main shell will still print [1] <PID> (PID of the intermediate process now?) and return to the prompt immediately. The "Pipeline Background Done" message will appear after 10 seconds. The final "Done" message for the job will appear shortly after that.
+
+Downside: This is less efficient as it creates an extra intermediate process that just waits. Proper process group handling is the standard solution.
+
+Implementing full process group job control is a big step. The simpler fix might get the timing closer to correct for background pipelines, but isn't how mature shells work internally.
