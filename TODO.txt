@@ -1,6 +1,6 @@
 in wordexp.c , arithm_expand() is just implemented minimally using grok. Find its better implementation.
 only dump.c executed as builtin. Also write functions for cd, help.
-piping
+piping (done)
 input output redirection
 command history
 line editing
@@ -8,6 +8,8 @@ tab completion
 syntax highlighting
 job control ?
 
+
+read this:
 Okay, that behavior indicates a problem with how the pipeline interacts with backgrounding (&).
 
 Here's the breakdown of what's happening and why "Pipeline Background Done" appears immediately:
