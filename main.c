@@ -377,7 +377,7 @@ int parse_and_execute(struct source_s *src)
     {
         // Call the pipeline parser, passing the address of the token pointer
         // This allows parse_pipeline to update current_token as it consumes tokens.
-        cmd_node = parse_pipeline(current_token);
+        cmd_node = parse_pipeline(&current_token);
 
         if (!cmd_node) {
             // Syntax error, message should be printed by the parser.
