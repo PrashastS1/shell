@@ -1,17 +1,23 @@
-// Create builtins/history.c
 #include <stdio.h>
-#include "../history.h" // Includes history function declarations
+#include <readline/readline.h> 
+#include <readline/history.h>
+#include "shell.h"
 
 int shell_history(int argc, char **argv) {
-    (void)argc; // Unused
+    (void)argc;
     (void)argv;
 
-    int count = get_history_count();
-    for (int i = 0; i < count; i++) {
-        // Print 1-based index and the command
-        // Assuming commands are stored WITH newline
-        printf("%5d  %s", i + 1, history_list[i]);
-        // If stored WITHOUT newline, use: printf("%5d %s\n", i + 1, history_list[i]);
+    HIST_ENTRY **the_list;
+    int i;
+
+    the_list = history_list();
+
+    if (the_list) {
+        for (i = 0; the_list[i]!=NULL; i++) {
+            printf("  %d  %s\n", i + history_base, the_list[i]->line);
+        }
+    } else {
     }
-    return 1; // Success, continue shell
+
+    return 1;
 }

@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include <errno.h>
 #include "shell.h"
 #include "source.h"

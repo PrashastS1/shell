@@ -7,7 +7,7 @@ line editing
 tab completion 
 syntax highlighting
 job control ?
-
+integrate 'exit' as a builtin
 
 read this:
 Okay, that behavior indicates a problem with how the pipeline interacts with backgrounding (&).

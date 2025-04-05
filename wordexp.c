@@ -844,7 +844,7 @@ struct word_s *word_expand(char *orig_word)
                     
 		    /* otherwise, extract the prefix */
                     len = p2-p;
-                    substitute_word(&pstart, &p, len, tilde_expand, !in_double_quotes);
+                    substitute_word(&pstart, &p, len, shell_tilde_expand, !in_double_quotes);
                     expanded = 1;
                 }
                 break;
@@ -1052,7 +1052,7 @@ struct word_s *word_expand(char *orig_word)
  *
  * returns the malloc'd expansion of the tilde prefix, NULL if expansion failed.
  */
-char *tilde_expand(char *s)
+char *shell_tilde_expand(char *s)
 {
     char *home = NULL;
     size_t len = strlen(s);
