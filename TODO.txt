@@ -1,10 +1,10 @@
 only dump.c executed as builtin. Also write functions for cd, help.
 piping (done)
-input output redirection
+input output redirection (done)
 command history viewing (done)
 command history re-execution
 line editing
-tab completion
+tab completion 
 syntax highlighting
 job control ?
 
