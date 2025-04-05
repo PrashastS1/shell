@@ -1,13 +1,12 @@
-only dump.c executed as builtin. Also write functions for cd, help.
+only dump.c executed as builtin. Also write functions for cd, help, exit.
 piping (done)
 input output redirection (done)
 command history viewing (done)
-command history re-execution
-line editing
+command history re-execution (done)
+line editing (done)
 tab completion 
 syntax highlighting
 job control ?
-integrate 'exit' as a builtin
 
 read this:
 Okay, that behavior indicates a problem with how the pipeline interacts with backgrounding (&).
