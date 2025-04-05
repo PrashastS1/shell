@@ -4,6 +4,8 @@
 enum node_type_e
 {
     NODE_COMMAND,           /* simple command */
+    NODE_AND,               /* command1 && command2 */
+    NODE_OR,                /* command1 || command2 */
     NODE_PIPE,
     NODE_VAR,               /* variable name (or simply, a word) */
 };
